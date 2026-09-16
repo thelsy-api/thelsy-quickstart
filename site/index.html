@@ -1,0 +1,1317 @@
+<!doctype html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Thelsy — DeepSeek Flash on an OpenAI-compatible API</title>
+<meta name="description" content="Thelsy serves DeepSeek Flash (model ID: deepseek-flash) on one OpenAI-compatible endpoint. Card payments in USD, per-token metering, no silent downgrades." />
+<meta name="theme-color" content="#06070a" />
+<meta name="color-scheme" content="dark" />
+<link rel="canonical" href="https://thelsy.com/" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://thelsy.com/" />
+<meta property="og:title" content="Thelsy — DeepSeek Flash on an OpenAI-compatible API" />
+<meta property="og:description" content="One OpenAI-compatible endpoint for DeepSeek Flash. Card payments in USD, per-token metering, no silent downgrades." />
+<meta property="og:site_name" content="Thelsy" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23090b10'/%3E%3Cpath d='M9 11h14M16 11v13' stroke='%237c5cff' stroke-width='3.2' stroke-linecap='round'/%3E%3C/svg%3E" />
+<style>
+/* ============================================================
+   Thelsy — design tokens
+   ============================================================ */
+:root{
+  --bg:#06070a;
+  --bg-soft:#0a0c12;
+  --surface:rgba(255,255,255,.026);
+  --surface-2:rgba(255,255,255,.05);
+  --border:rgba(255,255,255,.085);
+  --border-2:rgba(255,255,255,.16);
+  --text:#e9ebf2;
+  --muted:#98a1b4;
+  --muted-2:#6d7689;
+  --accent:#7c5cff;
+  --accent-2:#22d3ee;
+  --accent-3:#34d399;
+  --grad:linear-gradient(135deg,#7c5cff 0%,#4f8cff 48%,#22d3ee 100%);
+  --grad-soft:linear-gradient(135deg,rgba(124,92,255,.16),rgba(34,211,238,.12));
+  --radius:14px;
+  --radius-lg:22px;
+  --maxw:1180px;
+  --font:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --shadow:0 20px 60px -20px rgba(0,0,0,.8);
+  --ease:cubic-bezier(.2,.7,.2,1);
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:var(--font);font-size:16px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  overflow-x:hidden;
+}
+img,svg{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+::selection{background:rgba(124,92,255,.35)}
+:focus-visible{outline:2px solid var(--accent-2);outline-offset:3px;border-radius:6px}
+h1,h2,h3,h4{margin:0;line-height:1.15;letter-spacing:-.022em;font-weight:600}
+p{margin:0}
+ul{margin:0;padding:0;list-style:none}
+code{font-family:var(--mono);font-size:.92em;background:rgba(255,255,255,.06);padding:2px 6px;border-radius:6px;color:#d5d9e4}
+.skip{position:absolute;left:-9999px;top:0;z-index:200;padding:12px 18px;background:var(--accent);color:#fff;border-radius:0 0 12px 0}
+.skip:focus{left:0}
+
+/* backdrop layers */
+.bg{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.bg::before{
+  content:"";position:absolute;inset:-20% -10% auto -10%;height:120vh;
+  background:
+    radial-gradient(60% 55% at 18% 8%,rgba(124,92,255,.22),transparent 60%),
+    radial-gradient(50% 45% at 82% 4%,rgba(34,211,238,.16),transparent 62%),
+    radial-gradient(45% 40% at 55% 40%,rgba(79,140,255,.10),transparent 65%);
+  filter:blur(6px);
+}
+.bg-grid{
+  position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(120% 80% at 50% 0%,#000 0%,transparent 72%);
+  -webkit-mask-image:radial-gradient(120% 80% at 50% 0%,#000 0%,transparent 72%);
+}
+.bg-noise{
+  position:absolute;inset:0;opacity:.035;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* layout */
+.wrap{width:100%;max-width:var(--maxw);margin-inline:auto;padding-inline:22px}
+section{position:relative}
+.sec{padding:104px 0}
+.sec-sm{padding:72px 0}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  font:600 12.5px/1 var(--font);letter-spacing:.12em;text-transform:uppercase;
+  color:var(--accent-2);margin-bottom:16px;
+}
+.eyebrow::before{content:"";width:22px;height:1px;background:linear-gradient(90deg,transparent,var(--accent-2))}
+.sec-head{max-width:720px;margin-bottom:52px}
+.sec-head h2{font-size:clamp(28px,4vw,42px)}
+.sec-head p{margin-top:16px;color:var(--muted);font-size:17px}
+.grad-text{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* buttons */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  height:46px;padding:0 20px;border-radius:12px;font-weight:560;font-size:15px;
+  border:1px solid var(--border-2);background:var(--surface-2);color:var(--text);
+  transition:transform .18s var(--ease),background .18s,border-color .18s,box-shadow .25s;
+  white-space:nowrap;
+}
+.btn:hover{background:rgba(255,255,255,.085);border-color:rgba(255,255,255,.24);transform:translateY(-1px)}
+.btn-primary{
+  border-color:transparent;background:var(--grad);color:#fff;font-weight:600;
+  box-shadow:0 10px 30px -12px rgba(124,92,255,.9),inset 0 1px 0 rgba(255,255,255,.25);
+}
+.btn-primary:hover{background:var(--grad);box-shadow:0 16px 40px -12px rgba(124,92,255,1);filter:brightness(1.06)}
+.btn-sm{height:38px;padding:0 15px;font-size:14px;border-radius:10px}
+.btn-block{width:100%}
+
+/* nav */
+.nav{position:sticky;top:0;z-index:100;transition:background .3s,border-color .3s,backdrop-filter .3s;border-bottom:1px solid transparent}
+.nav.is-scrolled{background:rgba(6,7,10,.72);backdrop-filter:blur(14px) saturate(140%);border-bottom-color:var(--border)}
+.nav-in{display:flex;align-items:center;gap:18px;height:68px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:650;font-size:17px;letter-spacing:-.02em}
+.brand-mark{
+  width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+  background:linear-gradient(135deg,rgba(124,92,255,.9),rgba(34,211,238,.8));
+  box-shadow:0 6px 18px -8px rgba(124,92,255,.9),inset 0 1px 0 rgba(255,255,255,.3);
+}
+.brand-mark svg{width:18px;height:18px;stroke:#fff;stroke-width:2.4;stroke-linecap:round;fill:none}
+.nav-links{display:flex;align-items:center;gap:4px;margin-left:12px}
+.nav-links a{padding:9px 12px;border-radius:9px;font-size:14.5px;color:var(--muted);transition:color .18s,background .18s}
+.nav-links a:hover{color:var(--text);background:var(--surface-2)}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.lang{display:flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:rgba(255,255,255,.02)}
+.lang button{padding:7px 11px;font-size:12.5px;font-weight:600;color:var(--muted-2);letter-spacing:.02em;transition:.18s}
+.lang button[aria-pressed="true"]{background:var(--surface-2);color:var(--text)}
+.nav-toggle{display:none;width:42px;height:42px;border:1px solid var(--border);border-radius:11px;place-items:center}
+.nav-toggle span{display:block;width:17px;height:1.6px;background:var(--text);border-radius:2px;position:relative}
+.nav-toggle span::before,.nav-toggle span::after{content:"";position:absolute;left:0;width:17px;height:1.6px;background:var(--text);border-radius:2px}
+.nav-toggle span::before{top:-5.5px}
+.nav-toggle span::after{top:5.5px}
+.mobile-panel{
+  display:none;position:fixed;inset:68px 0 auto 0;z-index:99;
+  background:rgba(8,9,13,.97);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);
+  padding:14px 22px 24px;
+}
+.mobile-panel.open{display:block;animation:drop .28s var(--ease)}
+@keyframes drop{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+.mobile-panel a{display:block;padding:13px 4px;border-bottom:1px solid var(--border);color:var(--muted)}
+.mobile-panel .btn{margin-top:16px}
+
+/* hero */
+.hero{padding:86px 0 76px;position:relative}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:56px;align-items:center}
+.pill{
+  display:inline-flex;align-items:center;gap:9px;padding:6px 13px;border-radius:999px;
+  border:1px solid var(--border);background:rgba(255,255,255,.03);font-size:13px;color:var(--muted);
+  margin-bottom:22px;
+}
+.pill b{font-weight:600;color:var(--text)}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:var(--accent-3);box-shadow:0 0 0 3px rgba(52,211,153,.18);margin-left:4px}
+.hero h1{font-size:clamp(36px,5.4vw,62px);letter-spacing:-.035em;font-weight:640}
+.hero h1 em{font-style:normal;display:block}
+.hero-sub{margin-top:22px;font-size:17.5px;color:var(--muted);max-width:560px}
+.hero-cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px}
+.hero-note{margin-top:18px;font-size:13.5px;color:var(--muted-2);display:flex;flex-wrap:wrap;gap:6px 16px}
+.hero-note span{display:inline-flex;align-items:center;gap:7px}
+.hero-note svg{width:14px;height:14px;stroke:var(--accent-3);stroke-width:2.2;fill:none}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin-top:56px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.stat{background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.012));padding:20px 22px}
+.stat b{display:block;font-size:23px;font-weight:640;letter-spacing:-.02em}
+.stat span{display:block;font-size:13px;color:var(--muted-2);margin-top:5px}
+
+/* console mockup */
+.mock{
+  border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;
+  background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.015));
+  box-shadow:var(--shadow);position:relative;
+}
+.mock::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.07),transparent 30%)}
+.mock-bar{display:flex;align-items:center;gap:8px;padding:13px 16px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
+.mock-bar i{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.18)}
+.mock-bar i:first-child{background:rgba(248,113,113,.7)}
+.mock-bar i:nth-child(2){background:rgba(251,191,36,.7)}
+.mock-bar i:nth-child(3){background:rgba(52,211,153,.7)}
+.mock-bar em{margin-left:8px;font-style:normal;font:500 12px/1 var(--mono);color:var(--muted-2)}
+.mock-body{padding:16px}
+.mock-row{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;font:500 12.5px/1.5 var(--mono);color:var(--muted);background:rgba(255,255,255,.022);border:1px solid var(--border)}
+.mock-row + .mock-row{margin-top:8px}
+.mock-row .ok{color:var(--accent-3)}
+.mock-row .k{color:var(--accent-2)}
+.meter{margin-top:14px;padding:14px 15px;border-radius:12px;border:1px solid var(--border);background:rgba(124,92,255,.06)}
+.meter-top{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted)}
+.meter-top b{color:var(--text);font-weight:600}
+.bar{height:6px;border-radius:99px;background:rgba(255,255,255,.08);margin-top:10px;overflow:hidden}
+.bar i{display:block;height:100%;width:38%;background:var(--grad);border-radius:99px;animation:grow 1.4s var(--ease) both}
+@keyframes grow{from{width:0}to{width:38%}}
+.mock-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:12px;font:500 11.5px/1.5 var(--mono);color:var(--muted-2)}
+
+/* integrations */
+.integ{padding:44px 0 40px;border-block:1px solid var(--border);background:linear-gradient(180deg,rgba(255,255,255,.014),transparent)}
+.integ p{text-align:center;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);margin-bottom:24px}
+.marquee{overflow:hidden;mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+.marquee-track{display:flex;gap:12px;width:max-content;animation:slide 38s linear infinite}
+@media (prefers-reduced-motion:reduce){.marquee-track{animation:none;flex-wrap:wrap;justify-content:center;width:auto}}
+@keyframes slide{to{transform:translateX(-50%)}}
+.chip{
+  padding:9px 16px;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,.025);
+  font-size:13.5px;color:var(--muted);white-space:nowrap;
+}
+.chip b{color:var(--text);font-weight:600}/* cards */
+.grid{display:grid;gap:18px}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g2{grid-template-columns:repeat(2,1fr)}
+.card{
+  position:relative;padding:26px;border:1px solid var(--border);border-radius:var(--radius-lg);
+  background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012));
+  overflow:hidden;transition:border-color .25s,transform .25s var(--ease),background .25s;
+}
+.card::before{
+  content:"";position:absolute;inset:0;opacity:0;transition:opacity .3s;pointer-events:none;
+  background:radial-gradient(340px circle at var(--mx,50%) var(--my,0%),rgba(124,92,255,.16),transparent 66%);
+}
+.card:hover{border-color:var(--border-2);transform:translateY(-3px)}
+.card:hover::before{opacity:1}
+.card h3{font-size:17.5px;margin-bottom:10px}
+.card p{color:var(--muted);font-size:14.8px}
+.ico{
+  width:40px;height:40px;border-radius:11px;display:grid;place-items:center;margin-bottom:18px;
+  border:1px solid var(--border-2);background:var(--grad-soft);
+}
+.ico svg{width:20px;height:20px;stroke:var(--accent-2);stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+/* model table */
+.table-wrap{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:rgba(255,255,255,.014)}
+table{width:100%;border-collapse:collapse;font-size:14.6px}
+thead th{
+  text-align:left;padding:14px 20px;font:600 12px/1 var(--font);letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted-2);background:rgba(255,255,255,.028);border-bottom:1px solid var(--border);white-space:nowrap;
+}
+tbody td{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.055);vertical-align:middle}
+tbody tr:last-child td{border-bottom:0}
+tbody tr{transition:background .2s}
+tbody tr:hover{background:rgba(124,92,255,.055)}
+.m-name{font-family:var(--mono);font-size:14px;color:var(--text);font-weight:600}
+.m-use{color:var(--muted)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--text);font-weight:600;white-space:nowrap}
+.tag{
+  display:inline-block;padding:3.5px 9px;border-radius:7px;font-size:11.5px;font-weight:600;letter-spacing:.02em;
+  border:1px solid var(--border-2);background:rgba(255,255,255,.04);color:var(--muted);
+}
+.tag.hot{border-color:rgba(124,92,255,.5);background:rgba(124,92,255,.16);color:#cdbcff}
+.tag.mid{border-color:rgba(34,211,238,.42);background:rgba(34,211,238,.13);color:#a5ecf6}
+.tag.low{border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.12);color:#9ae6c4}
+.note{
+  display:flex;gap:11px;align-items:flex-start;margin-top:18px;padding:15px 18px;border-radius:12px;
+  border:1px solid var(--border);background:rgba(255,255,255,.02);color:var(--muted);font-size:13.8px;
+}
+.note svg{width:16px;height:16px;stroke:var(--accent-2);stroke-width:2;fill:none;flex:0 0 auto;margin-top:3px}
+.note.warn{border-color:rgba(251,191,36,.38);background:rgba(251,191,36,.07)}
+.note.warn svg{stroke:#fbbf24}
+.note.warn b{color:#ffd479}
+.sub-head{font-size:19px;margin:46px 0 20px;letter-spacing:-.015em;font-weight:600}
+.cap{padding:22px 24px;border:1px solid var(--border);border-radius:var(--radius-lg);background:rgba(255,255,255,.022)}
+.cap h3{font-size:16px;margin-bottom:15px;display:flex;align-items:center;gap:9px}
+.cap h3::before{content:"";width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.cap.ok h3::before{background:var(--accent-3);box-shadow:0 0 0 3px rgba(52,211,153,.16)}
+.cap.no h3::before{background:#f87171;box-shadow:0 0 0 3px rgba(248,113,113,.16)}
+.cap ul{display:grid;gap:9px;font-size:14.4px;color:var(--muted)}
+.cap li{display:flex;gap:10px;align-items:flex-start}
+.cap li svg{width:15px;height:15px;flex:0 0 auto;margin-top:4px;fill:none;stroke-width:2.4}
+.cap.ok li svg{stroke:var(--accent-3)}
+.cap.no li svg{stroke:#f87171}
+.testkey{display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;margin-top:22px;padding:24px 26px;border:1px solid var(--border-2);border-radius:var(--radius-lg);background:var(--grad-soft)}
+.testkey h3{font-size:17px;margin-bottom:8px}
+.testkey p{color:var(--muted);font-size:14.4px;max-width:64ch}
+.testkey a{color:var(--accent-2);text-decoration:underline;text-underline-offset:3px}
+.fine{margin-top:16px;color:var(--muted-2);font-size:13.2px;max-width:78ch}
+
+/* code */
+.code{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:rgba(4,5,8,.75);box-shadow:var(--shadow)}
+.code-bar{display:flex;align-items:center;gap:4px;padding:8px 10px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.022);overflow-x:auto}
+.code-bar .tab{padding:7px 13px;border-radius:8px;font-size:13px;color:var(--muted-2);white-space:nowrap;transition:.18s}
+.code-bar .tab[aria-selected="true"]{background:var(--surface-2);color:var(--text)}
+.code-bar .tab:hover{color:var(--text)}
+.code-bar .file-tag{padding:7px 13px;border-radius:8px;font:500 13px/1 var(--mono);color:var(--text)}
+.copy{margin-left:auto;padding:7px 12px;border-radius:8px;border:1px solid var(--border);font-size:12.5px;color:var(--muted);transition:.18s;white-space:nowrap}
+.copy:hover{color:var(--text);border-color:var(--border-2);background:var(--surface-2)}
+.copy.done{color:var(--accent-3);border-color:rgba(52,211,153,.4)}
+pre{margin:0;padding:20px;overflow-x:auto;font:500 13.4px/1.75 var(--mono);color:#d7dbe6;tab-size:2}
+pre code{background:none;padding:0;border-radius:0;font-size:inherit;color:inherit}
+pre[hidden]{display:none}
+.tk-c{color:#5d6a85}
+.tk-k{color:#c4a6ff}
+.tk-s{color:#7fe3c0}
+.tk-p{color:#8fd0ff}
+.tk-f{color:#ffd479}
+.tk-n{color:#f7a2c0}
+
+/* steps */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:30px}
+.step{padding:24px;border:1px solid var(--border);border-radius:var(--radius-lg);background:rgba(255,255,255,.022);position:relative}
+.step b{
+  display:grid;place-items:center;width:28px;height:28px;border-radius:9px;margin-bottom:15px;
+  background:var(--grad);color:#fff;font:600 13px/1 var(--font);
+}
+.step h4{font-size:16px;margin-bottom:8px}
+.step p{color:var(--muted);font-size:14.2px}
+
+/* pricing */
+.price-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;align-items:start}
+.plan{
+  position:relative;padding:28px 26px 30px;border:1px solid var(--border);border-radius:var(--radius-lg);
+  background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012));
+  display:flex;flex-direction:column;gap:22px;transition:transform .25s var(--ease),border-color .25s;
+}
+.plan:hover{transform:translateY(-3px);border-color:var(--border-2)}
+.plan.featured{border-color:rgba(124,92,255,.55);background:linear-gradient(180deg,rgba(124,92,255,.14),rgba(255,255,255,.018));box-shadow:0 24px 70px -30px rgba(124,92,255,.85)}
+.badge{
+  position:absolute;top:-11px;left:26px;padding:5px 12px;border-radius:999px;background:var(--grad);
+  font:600 11.5px/1 var(--font);letter-spacing:.06em;text-transform:uppercase;color:#fff;
+}
+.plan h3{font-size:16px;letter-spacing:.01em}
+.plan .amt{display:flex;align-items:baseline;gap:7px;margin-top:12px}
+.plan .amt b{font-size:42px;font-weight:640;letter-spacing:-.035em;line-height:1}
+.plan .amt span{color:var(--muted-2);font-size:14px}
+.plan .desc{color:var(--muted);font-size:14.2px;margin-top:12px;min-height:44px}
+.plan ul{display:grid;gap:11px;font-size:14.2px}
+.plan li{display:flex;gap:10px;align-items:flex-start;color:var(--muted)}
+.plan li svg{width:16px;height:16px;flex:0 0 auto;margin-top:4px;stroke:var(--accent-3);stroke-width:2.4;fill:none}
+.plan li b{color:var(--text);font-weight:600}
+
+/* faq */
+.faq{display:grid;gap:12px;max-width:840px;margin-inline:auto}
+details{border:1px solid var(--border);border-radius:var(--radius);background:rgba(255,255,255,.022);transition:border-color .2s,background .2s}
+details[open]{border-color:var(--border-2);background:rgba(255,255,255,.04)}
+summary{display:flex;align-items:center;gap:14px;padding:18px 20px;cursor:pointer;font-weight:560;font-size:15.6px;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary .plus{margin-left:auto;flex:0 0 auto;width:20px;height:20px;position:relative}
+summary .plus::before,summary .plus::after{content:"";position:absolute;background:var(--muted);border-radius:2px;transition:transform .25s var(--ease),background .2s}
+summary .plus::before{top:9px;left:0;width:20px;height:1.6px}
+summary .plus::after{left:9px;top:0;width:1.6px;height:20px}
+details[open] summary .plus::after{transform:rotate(90deg) scaleY(0)}
+details[open] summary .plus::before{background:var(--accent-2)}
+details .ans{padding:0 20px 20px;color:var(--muted);font-size:14.6px;max-width:74ch}
+details .ans a{color:var(--accent-2);text-decoration:underline;text-underline-offset:3px}
+
+/* final cta */
+.cta-box{
+  position:relative;padding:64px 44px;border:1px solid var(--border-2);border-radius:28px;text-align:center;overflow:hidden;
+  background:radial-gradient(80% 130% at 50% -20%,rgba(124,92,255,.3),transparent 60%),linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.012));
+}
+.cta-box h2{font-size:clamp(28px,4vw,42px);max-width:640px;margin-inline:auto}
+.cta-box p{margin:18px auto 0;color:var(--muted);max-width:520px;font-size:16.5px}
+.cta-box .hero-cta{justify-content:center}
+
+/* footer */
+footer{border-top:1px solid var(--border);padding:60px 0 34px;margin-top:20px;background:linear-gradient(180deg,transparent,rgba(255,255,255,.014))}
+.f-grid{display:grid;grid-template-columns:1.5fr repeat(3,1fr);gap:40px}
+.f-brand p{color:var(--muted);font-size:14px;margin-top:16px;max-width:300px}
+.f-col h4{font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);margin-bottom:16px}
+.f-col a{display:block;padding:6px 0;color:var(--muted);font-size:14.2px;transition:color .18s}
+.f-col a:hover{color:var(--text)}
+.f-bottom{
+  margin-top:46px;padding-top:24px;border-top:1px solid var(--border);
+  display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between;
+  color:var(--muted-2);font-size:13px;
+}
+.f-bottom .legal{max-width:640px}
+
+/* reveal on scroll */
+.reveal{opacity:0;transform:translateY(20px);transition:opacity .7s var(--ease),transform .7s var(--ease);transition-delay:var(--d,0s)}
+.reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+
+/* responsive */
+@media (max-width:1000px){
+  .hero-grid{grid-template-columns:1fr;gap:44px}
+  .hero-sub{max-width:none}
+  .g3,.steps,.price-grid{grid-template-columns:1fr 1fr}
+  .plan.featured{transform:none}
+  .f-grid{grid-template-columns:1fr 1fr;gap:32px}
+}
+@media (max-width:760px){
+  .sec{padding:76px 0}
+  .nav-links{display:none}
+  .nav-toggle{display:grid}
+  .nav .btn-sm{display:none}
+  .g3,.g2,.steps,.price-grid{grid-template-columns:1fr}
+  .stats{grid-template-columns:1fr 1fr}
+  .f-grid{grid-template-columns:1fr}
+  .cta-box{padding:48px 22px}
+  .mock-legend{font-size:11px}
+  thead{display:none}
+  tbody td{display:flex;justify-content:space-between;gap:16px;padding:12px 18px;border-bottom:0}
+  tbody tr{display:block;border-bottom:1px solid rgba(255,255,255,.06);padding:8px 0}
+  tbody td::before{content:attr(data-l);color:var(--muted-2);font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+  .m-use{text-align:right}
+}
+@media (min-width:761px){.mobile-panel{display:none !important}}
+</style>
+<meta name="msvalidate.01" content="1C6EAF82241213C932C66773D2A08F5F" />
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="bg" aria-hidden="true"><div class="bg-grid"></div><div class="bg-noise"></div></div>
+
+<!-- ====== nav ====== -->
+<header class="nav" id="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top" aria-label="Thelsy home">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 7h14M12 7v10"/></svg></span>
+      Thelsy
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="#models" data-i18n="nav.models">Models</a>
+      <a href="#features" data-i18n="nav.features">Why Thelsy</a>
+      <a href="#quickstart" data-i18n="nav.quickstart">Quickstart</a>
+      <a href="#codex" data-i18n="nav.codex">Codex CLI</a>
+      <a href="#pricing" data-i18n="nav.pricing">Pricing</a>
+      <a href="#faq" data-i18n="nav.faq">FAQ</a>
+    </nav>
+    <div class="nav-right">
+      <div class="lang" role="group" aria-label="Language">
+        <button type="button" aria-pressed="true" data-lang-btn="en">EN</button>
+        <button type="button" aria-pressed="false" data-lang-btn="zh">中文</button>
+      </div>
+      <a class="btn btn-sm" href="https://api.thelsy.com/sign-in" data-signin data-i18n="nav.signin">Sign in</a>
+      <a class="btn btn-sm btn-primary" href="#pricing" data-i18n="nav.cta">Get API key</a>
+      <button class="nav-toggle" type="button" id="navToggle" aria-expanded="false" aria-controls="mobilePanel" aria-label="Menu"><span></span></button>
+    </div>
+  </div>
+</header>
+<div class="mobile-panel" id="mobilePanel">
+  <a href="#models" data-i18n="nav.models">Models</a>
+  <a href="#features" data-i18n="nav.features">Why Thelsy</a>
+  <a href="#quickstart" data-i18n="nav.quickstart">Quickstart</a>
+  <a href="#codex" data-i18n="nav.codex">Codex CLI</a>
+  <a href="#pricing" data-i18n="nav.pricing">Pricing</a>
+  <a href="#faq" data-i18n="nav.faq">FAQ</a>
+  <a href="https://api.thelsy.com/sign-in" data-signin data-i18n="nav.signin">Sign in</a>
+  <a class="btn btn-primary btn-block" href="#pricing" data-i18n="nav.cta">Get API key</a>
+</div>
+
+<main id="main">
+<!-- ====== hero ====== -->
+<section class="hero" id="top">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <span class="pill"><b data-i18n="hero.pill.a">OpenAI-compatible</b><span data-i18n="hero.pill.b">API gateway</span><i class="dot" aria-hidden="true"></i></span>
+        <h1>
+          <em data-i18n="hero.h1.a">DeepSeek Flash.</em>
+          <em class="grad-text" data-i18n="hero.h1.b">One API key, ready to ship.</em>
+        </h1>
+        <p class="hero-sub" data-i18n="hero.sub">Thelsy serves DeepSeek Flash (model ID: <code>deepseek-flash</code>) on one OpenAI-compatible endpoint. Keep your existing SDK, change one URL, pay with the card you already have.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="#pricing" data-i18n="hero.cta1">Get your API key</a>
+          <a class="btn" href="#quickstart" data-i18n="hero.cta2">See the quickstart</a>
+        </div>
+        <p class="hero-note">
+          <span><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="hero.note.a">No minimum spend</span></span>
+          <span><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="hero.note.b">Cancel anytime</span></span>
+          <span><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="hero.note.c">Served from Hong Kong</span></span>
+        </p>
+        <div class="stats">
+          <div class="stat"><b>1</b><span data-i18n="stat.a">model on one endpoint</span></div>
+          <div class="stat"><b>1</b><span data-i18n="stat.b">OpenAI-compatible API</span></div>
+          <div class="stat"><b>99.9%</b><span data-i18n="stat.c">uptime target</span></div>
+          <div class="stat"><b>0</b><span data-i18n="stat.d">silent model swaps</span></div>
+        </div>
+      </div>
+
+      <div class="mock reveal" aria-hidden="true">
+        <div class="mock-bar"><i></i><i></i><i></i><em>POST /v1/chat/completions</em></div>
+        <div class="mock-body">
+          <div class="mock-row"><span class="ok">200</span><span><span class="k">model</span>: deepseek-flash</span></div>
+          <div class="mock-row"><span>ttft 412ms</span><span><span class="k">stream</span>: true</span></div>
+          <div class="mock-row"><span class="k">tokens</span><span>in 3,182 · out 806 · cache 1,204</span></div>
+          <div class="meter">
+            <div class="meter-top"><span data-i18n="mock.credit">Monthly allowance</span><b>80M tokens</b></div>
+            <div class="bar"><i></i></div>
+            <div class="mock-legend">
+              <span>49.6M <span data-i18n="mock.left">left</span></span>
+              <span>30.4M <span data-i18n="mock.used">used</span></span>
+              <span data-i18n="mock.reset">resets in 12 days</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section><!-- ====== integrations ====== -->
+<section class="integ">
+  <div class="wrap">
+    <p data-i18n="integ.title">Drops into the stack you already use</p>
+  </div>
+  <div class="marquee">
+    <div class="marquee-track" id="marquee">
+      <span class="chip"><b>OpenAI</b> SDK</span>
+      <span class="chip"><b>Vercel</b> AI SDK</span>
+      <span class="chip"><b>LangChain</b></span>
+      <span class="chip"><b>LlamaIndex</b></span>
+      <span class="chip"><b>Dify</b></span>
+      <span class="chip"><b>n8n</b></span>
+      <span class="chip"><b>Cursor</b></span>
+      <span class="chip"><b>Continue</b></span>
+      <span class="chip"><b>OpenWebUI</b></span>
+      <span class="chip"><b>LiteLLM</b></span>
+    </div>
+  </div>
+</section>
+
+<!-- ====== why ====== -->
+<section class="sec" id="features">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow" data-i18n="feat.eyebrow">Why Thelsy</span>
+      <h2 data-i18n="feat.h2">Built for teams the big providers forgot to bill.</h2>
+      <p data-i18n="feat.sub">Chinese labs still expect WeChat Pay or Alipay, and US labs block resale. Thelsy sits in the middle as a delivery layer: one contract, one bill, one key.</p>
+    </div>
+    <div class="grid g3">
+      <article class="card reveal" style="--d:.02s">
+        <div class="ico"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20M6 15h3"/></svg></div>
+        <h3 data-i18n="feat.1.h">Pay the way you actually pay</h3>
+        <p data-i18n="feat.1.p">No WeChat Pay, no Alipay, no mainland phone number. Thelsy bills in USD on any major card, with receipts you can expense and invoices for your accountant.</p>
+      </article>
+      <article class="card reveal" style="--d:.06s">
+        <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="4"/><path d="M12 3v6M9 19l-1 3M15 19l1 3"/></svg></div>
+        <h3 data-i18n="feat.2.h">One key, one endpoint</h3>
+        <p data-i18n="feat.2.p">Point your OpenAI SDK at <code>https://api.thelsy.com/v1</code> and you are done. Same key for every environment, same request schema, same invoice — no second signup in the middle of a launch.</p>
+      </article>
+      <article class="card reveal" style="--d:.1s">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h3 data-i18n="feat.3.h">No silent downgrades</h3>
+        <p data-i18n="feat.3.p">We never quietly route your request to a cheaper model. If a route changes, it is published, dated and shown in your call logs — because trust is the whole product.</p>
+      </article>
+      <article class="card reveal" style="--d:.02s">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 20V6M4 20h16M8 20v-6M12 20V9M16 20v-4M20 20v-9"/></svg></div>
+        <h3 data-i18n="feat.4.h">Metering you can audit</h3>
+        <p data-i18n="feat.4.p">Every request shows input, output and cache tokens on its own line. Export the ledger as CSV, set hard budget caps, reconcile to the token.</p>
+      </article>
+      <article class="card reveal" style="--d:.06s">
+        <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg></div>
+        <h3 data-i18n="feat.5.h">Made for streaming and agents</h3>
+        <p data-i18n="feat.5.p">SSE streaming with usage in the final chunk, tool calling, JSON mode and long contexts. Upstream quirks are normalised, so one client works across every model.</p>
+      </article>
+      <article class="card reveal" style="--d:.1s">
+        <div class="ico"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 15v2"/></svg></div>
+        <h3 data-i18n="feat.6.h">Handled with care</h3>
+        <p data-i18n="feat.6.p">Requests are desensitised before they reach a log, records are retained for six months, and your prompts and completions are never sold or used to train models.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ====== models ====== -->
+<section class="sec" id="models">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow" data-i18n="models.eyebrow">Model catalogue</span>
+      <h2 data-i18n="models.h2">Priced per token. Nothing bundled.</h2>
+      <p data-i18n="models.sub">Reference rates per 1M tokens, blended across input, output and cache. The console shows the itemised rate card — including cache reads and writes — before you commit a request.</p>
+    </div>
+
+    <div class="table-wrap reveal">
+      <table>
+        <thead>
+          <tr>
+            <th data-i18n="t.model">Model</th>
+            <th data-i18n="t.use">Best for</th>
+            <th data-i18n="t.tier">Tier</th>
+            <th data-i18n="t.price">Per 1M tokens</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td data-l="Model"><span class="m-name">deepseek-flash</span></td>
+            <td data-l="Best for" class="m-use" data-i18n="m.dsflash">Chat, extraction, tool calling and long-context work</td>
+            <td data-l="Tier"><span class="tag low" data-i18n="tier.economy">Economy</span></td>
+            <td data-l="Per 1M tokens"><span class="num">$0.65</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note reveal">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+      <span data-i18n="models.note">Blended reference rates. Cache hits and cache writes are billed separately — cache-heavy workloads are usually the cheapest way to run a model, and the saving is shown on every request.</span>
+    </div>
+        <h3 class="sub-head reveal" data-i18n="cap.h">Capability boundaries</h3>
+        <div class="grid g2">
+          <div class="cap ok reveal" style="--d:.02s">
+            <h3 data-i18n="cap.ok.h">What the API can do</h3>
+            <ul>
+              <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="cap.ok.1">Text generation and chat</span></li>
+              <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="cap.ok.2">Function calling — OpenAI-compatible <code>tools</code> and <code>tool_calls</code></span></li>
+              <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="cap.ok.3">Structured output — <code>response_format: json_object</code></span></li>
+              <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="cap.ok.4">Reasoning — thinking mode on by default, the trace returned in <code>reasoning_content</code></span></li>
+              <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="cap.ok.5">Image understanding — images as input</span></li>
+              <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="cap.ok.6"><b>1M token</b> context window, up to <b>384K</b> output tokens</span></li>
+            </ul>
+          </div>
+          <div class="cap no reveal" style="--d:.06s">
+            <h3 data-i18n="cap.no.h">What it cannot do</h3>
+            <ul>
+              <li><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg><span data-i18n="cap.no.1">Image generation</span></li>
+              <li><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg><span data-i18n="cap.no.2">Audio or video generation</span></li>
+            </ul>
+          </div>
+        </div>
+        <p class="fine reveal" data-i18n="cap.note">Responses come from the upstream model and can be wrong. Verify anything important yourself before you rely on it.</p>
+  </div>
+</section><!-- ====== quickstart ====== -->
+<section class="sec" id="quickstart">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow" data-i18n="qs.eyebrow">Quickstart</span>
+      <h2 data-i18n="qs.h2">Live in about two minutes.</h2>
+      <p data-i18n="qs.sub">If your code already talks to the OpenAI API, you only change <code>base_url</code> and the key. Keep your SDK, your retries and your prompt templates.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step reveal" style="--d:.02s">
+        <b>1</b>
+        <h4 data-i18n="qs.1.h">Create your account</h4>
+        <p data-i18n="qs.1.p">Pay on Creem&#39;s checkout page — no signup needed first. Within a few hours we open your account and email your console sign-in details and API key to the address you paid with.</p>
+      </div>
+      <div class="step reveal" style="--d:.06s">
+        <b>2</b>
+        <h4 data-i18n="qs.2.h">Point your base URL at Thelsy</h4>
+        <p data-i18n="qs.2.p">Use <code>https://api.thelsy.com/v1</code> instead of the provider URL. Model names stay exactly as they appear in the catalogue.</p>
+      </div>
+      <div class="step reveal" style="--d:.1s">
+        <b>3</b>
+        <h4 data-i18n="qs.3.h">Ship and watch the ledger</h4>
+        <p data-i18n="qs.3.p">Every call lands in the usage log with its token split. Set a budget cap and get an alert before you spend past it.</p>
+      </div>
+    </div>
+
+    <div class="code reveal">
+      <div class="code-bar" role="tablist" aria-label="Code examples">
+        <button class="tab" role="tab" aria-selected="true" data-tab="curl">cURL</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="python">Python</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="node">Node.js</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="stream">Streaming</button>
+        <button class="copy" type="button" id="copyBtn" data-i18n="qs.copy">Copy</button>
+      </div>
+
+<pre id="p-curl"><code><span class="tk-c"># One request, no SDK required</span>
+curl https://api.thelsy.com/v1/chat/completions \
+  -H <span class="tk-s">"Authorization: Bearer $THELSY_API_KEY"</span> \
+  -H <span class="tk-s">"Content-Type: application/json"</span> \
+  -d <span class="tk-s">'{
+    "model": "deepseek-flash",
+    "messages": [
+      {"role": "user", "content": "Draft a launch email."}
+    ]
+  }'</span></code></pre>
+
+<pre id="p-python" hidden><code><span class="tk-k">import</span> os
+<span class="tk-k">from</span> openai <span class="tk-k">import</span> OpenAI
+
+client = OpenAI(
+    base_url=<span class="tk-s">"https://api.thelsy.com/v1"</span>,
+    api_key=os.environ[<span class="tk-s">"THELSY_API_KEY"</span>],
+)
+
+resp = client.chat.completions.create(
+    model=<span class="tk-s">"deepseek-flash"</span>,
+    messages=[{<span class="tk-s">"role"</span>: <span class="tk-s">"user"</span>, <span class="tk-s">"content"</span>: <span class="tk-s">"Refactor this migration script."</span>}],
+)
+
+<span class="tk-f">print</span>(resp.choices[<span class="tk-n">0</span>].message.content)
+<span class="tk-f">print</span>(resp.usage)  <span class="tk-c"># prompt, completion and cache tokens</span></code></pre>
+
+<pre id="p-node" hidden><code><span class="tk-k">import</span> OpenAI <span class="tk-k">from</span> <span class="tk-s">"openai"</span>;
+
+<span class="tk-k">const</span> client = <span class="tk-k">new</span> <span class="tk-f">OpenAI</span>({
+  baseURL: <span class="tk-s">"https://api.thelsy.com/v1"</span>,
+  apiKey: process.env.THELSY_API_KEY,
+});
+
+<span class="tk-k">const</span> res = <span class="tk-k">await</span> client.chat.completions.<span class="tk-f">create</span>({
+  model: <span class="tk-s">"deepseek-flash"</span>,
+  messages: [{ role: <span class="tk-s">"user"</span>, content: <span class="tk-s">"Summarise this thread."</span> }],
+});
+
+console.<span class="tk-f">log</span>(res.choices[<span class="tk-n">0</span>].message.content);</code></pre>
+
+<pre id="p-stream" hidden><code><span class="tk-c"># Streaming, with a usage report in the final chunk</span>
+stream = client.chat.completions.create(
+    model=<span class="tk-s">"deepseek-flash"</span>,
+    messages=[{<span class="tk-s">"role"</span>: <span class="tk-s">"user"</span>, <span class="tk-s">"content"</span>: <span class="tk-s">"Write a changelog."</span>}],
+    stream=<span class="tk-k">True</span>,
+    stream_options={<span class="tk-s">"include_usage"</span>: <span class="tk-k">True</span>},
+)
+
+<span class="tk-k">for</span> chunk <span class="tk-k">in</span> stream:
+    <span class="tk-k">if</span> chunk.usage:
+        <span class="tk-f">print</span>(<span class="tk-s">"billed:"</span>, chunk.usage.total_tokens)
+    <span class="tk-k">elif</span> chunk.choices[<span class="tk-n">0</span>].delta.content:
+        <span class="tk-f">print</span>(chunk.choices[<span class="tk-n">0</span>].delta.content, end=<span class="tk-s">""</span>)</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ====== codex ====== -->
+<section class="sec" id="codex">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow" data-i18n="codex.eyebrow">Codex CLI</span>
+      <h2 data-i18n="codex.h2">Point Codex CLI straight at Thelsy.</h2>
+      <p data-i18n="codex.sub">The Codex CLI can use this service directly. Add the block below to your Codex config (default <code>~/.codex/config.toml</code>), and Codex will run on <code>deepseek-flash</code> through our endpoint.</p>
+    </div>
+
+    <div class="code reveal">
+      <div class="code-bar">
+        <span class="file-tag">~/.codex/config.toml</span>
+        <button class="copy" type="button" data-copy="p-codex" data-i18n="codex.copy">Copy</button>
+      </div>
+<pre id="p-codex"><code><span class="tk-p">model</span> = <span class="tk-s">"deepseek-flash"</span>
+<span class="tk-p">model_provider</span> = <span class="tk-s">"custom"</span>
+<span class="tk-p">disable_response_storage</span> = <span class="tk-k">true</span>
+
+[<span class="tk-p">model_providers.custom</span>]
+<span class="tk-p">base_url</span> = <span class="tk-s">"https://api.thelsy.com/v1"</span>
+<span class="tk-p">wire_api</span> = <span class="tk-s">"responses"</span></code></pre>
+    </div>
+
+    <div class="note warn reveal">
+      <svg viewBox="0 0 24 24"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+      <span data-i18n="codex.note"><b><code>disable_response_storage = true</code> is required.</b> Without that line the request fails with <code>stream closed before response.completed</code>. Keep it exactly as written above.</span>
+    </div>
+  </div>
+</section>
+<!-- ====== claude ====== -->
+<section class="sec" id="claude">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow" data-i18n="claude.eyebrow">Claude Code</span>
+      <h2 data-i18n="claude.h2">Point Claude Code straight at Thelsy.</h2>
+      <p data-i18n="claude.sub">We serve an Anthropic-compatible endpoint on the same host. Set the two variables below and Claude Code runs on <code>deepseek-flash</code> through your plan — streaming, tool use and system prompts included.</p>
+    </div>
+
+    <div class="code reveal">
+      <div class="code-bar">
+        <span class="file-tag">terminal</span>
+        <button class="copy" type="button" data-copy="p-claude" data-i18n="claude.copy">Copy</button>
+      </div>
+<pre id="p-claude"><code><span class="tk-p">export</span> <span class="tk-k">ANTHROPIC_BASE_URL</span>=<span class="tk-s">"https://api.thelsy.com"</span>
+<span class="tk-p">export</span> <span class="tk-k">ANTHROPIC_AUTH_TOKEN</span>=<span class="tk-s">"sk-your-thelsy-key"</span>
+<span class="tk-p">claude</span></code></pre>
+    </div>
+
+    <div class="note reveal">
+      <svg viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <span data-i18n="claude.note">On Windows PowerShell, set the same two variables with <code>$env:ANTHROPIC_BASE_URL = "https://api.thelsy.com"</code> and <code>$env:ANTHROPIC_AUTH_TOKEN = "sk-your-thelsy-key"</code>, then run <code>claude</code>. Install it first with <code>npm install -g @anthropic-ai/claude-code</code>.</span>
+    </div>
+  </div>
+</section>
+<!-- ====== pricing ====== -->
+<section class="sec" id="pricing">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow" data-i18n="price.eyebrow">Pricing</span>
+      <h2 data-i18n="price.h2">Plans for scale. Tokens at cost-plus.</h2>
+      <p data-i18n="price.sub">Every plan reaches the full catalogue at the same per-token rates. The plan decides your monthly token allowance, throughput and support — never which models you are allowed to use.</p>
+    </div>
+
+    <div class="price-grid">
+      <article class="plan reveal" style="--d:.02s">
+        <div>
+          <h3 data-i18n="plan.starter">Starter</h3>
+          <div class="amt"><b>$19</b><span data-i18n="price.mo">/ month</span></div>
+          <p class="desc" data-i18n="plan.starter.d">For solo builders shipping a first prototype.</p>
+        </div>
+        <ul>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.starter.1"><b>30M tokens</b> included each month</span></li>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.over.80">Extra tokens at <b>$0.80</b> / 1M</span></li>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.starter.2"><b>2</b> API keys</span></li>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.starter.3">The full catalogue, no tiering</span></li>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.starter.4">60 requests per minute</span></li>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.starter.5">Email support</span></li>
+        </ul>
+        <a class="btn btn-block" href="https://www.creem.io/payment/prod_vbjn769WOhlgFrs1l8xxI" data-i18n="plan.cta">Start with Starter</a>
+      </article>
+
+      <article class="plan featured reveal" style="--d:.06s">
+        <span class="badge" data-i18n="plan.popular">Most popular</span>
+        <div>
+          <h3 data-i18n="plan.pro">Pro</h3>
+          <div class="amt"><b>$49</b><span data-i18n="price.mo">/ month</span></div>
+          <p class="desc" data-i18n="plan.pro.d">For products with real traffic and real users.</p>
+        </div>
+        <ul>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.pro.1"><b>80M tokens</b> included each month</span></li>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.over.80">Extra tokens at <b>$0.80</b> / 1M</span></li>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.pro.2"><b>10</b> API keys and separate environments</span></li>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.pro.3">Priority routing on every model</span></li>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.pro.4">Budget caps and spend alerts</span></li>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.pro.5">300 requests per minute</span></li>
+        </ul>
+        <a class="btn btn-primary btn-block" href="https://www.creem.io/payment/prod_swK62yIjSXEUI0fLWNrRu" data-i18n="plan.cta2">Choose Pro</a>
+      </article>
+
+      <article class="plan reveal" style="--d:.1s">
+        <div>
+          <h3 data-i18n="plan.biz">Business</h3>
+          <div class="amt"><b>$149</b><span data-i18n="price.mo">/ month</span></div>
+          <p class="desc" data-i18n="plan.biz.d">For teams that need invoices and an SLA.</p>
+        </div>
+        <ul>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.biz.1"><b>250M tokens</b> included each month</span></li>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.over.75">Extra tokens at <b>$0.75</b> / 1M</span></li>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.biz.2">Unlimited keys and team seats</span></li>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.biz.3">1,000 requests / minute on a dedicated channel</span></li>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.biz.4">99.9% uptime SLA and a DPA</span></li>
+          <li><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="plan.biz.5">Invoices, receipts and priority support</span></li>
+        </ul>
+        <a class="btn btn-block" href="https://www.creem.io/payment/prod_69DH5ur32hEHhwBYQKXxs8" data-i18n="plan.cta3">Choose Business</a>
+      </article>
+    </div>
+
+    <div class="note reveal">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+      <span data-i18n="price.note">Included tokens are used first. Overage is never billed automatically: when an allowance runs out, calls stop instead of turning into a surprise invoice — add more tokens or move up a plan to keep going. Allowances are estimated on a typical input/output mix, so output-heavy work — long documents, code generation — burns through them faster. Change plans or cancel from the console at any time: no lock-in, no exit fee.</span>
+    </div>
+    <h3 class="sub-head reveal" data-i18n="pay.h">What happens after you pay</h3>
+    <div class="steps">
+      <div class="step reveal" style="--d:.02s">
+        <b>1</b>
+        <h4 data-i18n="pay.1.h">You pay by card</h4>
+        <p data-i18n="pay.1.p">Checkout runs on Creem&#39;s hosted page. There is nothing to sign up for first.</p>
+      </div>
+      <div class="step reveal" style="--d:.06s">
+        <b>2</b>
+        <h4 data-i18n="pay.2.h">We open your account</h4>
+        <p data-i18n="pay.2.p">Usually within a few hours we activate your account and email your console sign-in details and API key to the address you paid with.</p>
+      </div>
+      <div class="step reveal" style="--d:.1s">
+        <b>3</b>
+        <h4 data-i18n="pay.3.h">Start calling the API</h4>
+        <p data-i18n="pay.3.p">Point your SDK at <code>https://api.thelsy.com/v1</code> and send your first request.</p>
+      </div>
+    </div>
+    <p class="fine reveal" data-i18n="pay.urgent">In a hurry? Email <a href="mailto:support@thelsy.com">support@thelsy.com</a> right after paying and we will prioritise your setup.</p>
+
+    <div class="testkey reveal">
+      <div>
+        <h3 data-i18n="test.h">Not sure yet? Get a free test key</h3>
+        <p data-i18n="test.p">Email <a href="mailto:support@thelsy.com?subject=Free%20test%20key">support@thelsy.com</a> with the subject <b>Free test key</b> and we will send you a key to try. No credit card and no signup.</p>
+      </div>
+      <a class="btn" href="mailto:support@thelsy.com?subject=Free%20test%20key" data-i18n="test.btn">Request a test key</a>
+    </div>
+
+    <p class="fine reveal" data-i18n="pay.mor">Payments are processed by our merchant of record, which handles taxes, invoices and card processing on our behalf.</p>
+  </div>
+</section>
+
+<!-- ====== faq ====== -->
+<section class="sec" id="faq">
+  <div class="wrap">
+    <div class="sec-head reveal" style="margin-inline:auto;text-align:center;max-width:680px">
+      <span class="eyebrow" data-i18n="faq.eyebrow" style="justify-content:center">FAQ</span>
+      <h2 data-i18n="faq.h2">Questions worth asking a gateway</h2>
+    </div>
+
+    <div class="faq">
+      <details class="reveal" open>
+        <summary><span data-i18n="faq.1.q">Which models can I call today?</span><span class="plus" aria-hidden="true"></span></summary>
+        <div class="ans" data-i18n="faq.1.a">Right now the catalogue is <code>deepseek-flash</code> (DeepSeek Flash), served on the OpenAI-compatible endpoint at <code>https://api.thelsy.com/v1</code>. More channels are added to the same endpoint and announced in the changelog, and the live status of each model is always visible in the console.</div>
+      </details>
+      <details class="reveal">
+        <summary><span data-i18n="faq.2.q">Do I have to rewrite my integration?</span><span class="plus" aria-hidden="true"></span></summary>
+        <div class="ans" data-i18n="faq.2.a">No. We speak the OpenAI wire format, so you keep your SDK, your streaming parser and your tool-calling code. Point <code>base_url</code> at <code>https://api.thelsy.com/v1</code>, swap in your Thelsy key, and keep the model names you already use.</div>
+      </details>
+      <details class="reveal">
+        <summary><span data-i18n="faq.3.q">How exactly am I billed?</span><span class="plus" aria-hidden="true"></span></summary>
+        <div class="ans" data-i18n="faq.3.a">Per token, per request. Input, output and cache tokens are counted separately and shown on each line of the usage log, so a cache hit is visibly cheaper than a cold prompt. Your included tokens are drawn down first; when they run out, calls stop until you add more tokens or move up a plan. Nothing is ever billed beyond your subscription price.</div>
+      </details>
+      <details class="reveal">
+        <summary><span data-i18n="faq.cli.q">How quickly do coding agents use up a plan?</span><span class="plus" aria-hidden="true"></span></summary>
+        <div class="ans" data-i18n="faq.cli.a">Much faster than chat. Claude Code and Codex CLI resend a long context on every turn, so a single task can move hundreds of thousands of tokens — a Starter allowance that comfortably covers a month of ordinary API calls can be spent in days of heavy agent use. Prompt caching makes the repeated part cheaper, and every request is itemised in your usage log. Once the tokens included in your cycle are used up, calls stop until you add more or move up a plan; if you intend to run an agent all day, Pro or Business is the better seat.</div>
+      </details>
+      <details class="reveal">
+        <summary><span data-i18n="faq.4.q">Will you ever silently switch my model?</span><span class="plus" aria-hidden="true"></span></summary>
+        <div class="ans" data-i18n="faq.4.a">Never. Charging for a frontier model while quietly serving a weaker one is the fastest way to destroy a developer&#39;s trust, and it is off the table by policy. If a route has to change, it is published with a date and the change is visible in your call log.</div>
+      </details>
+      <details class="reveal">
+        <summary><span data-i18n="faq.5.q">What happens to my prompts and completions?</span><span class="plus" aria-hidden="true"></span></summary>
+        <div class="ans" data-i18n="faq.5.a">Requests are desensitised before they are written to a log, records are kept for six months for accounting and abuse review, and nothing is sold or used to train a model. Business customers can ask for request-body logging to be switched off entirely, keeping only the metering record.</div>
+      </details>
+      <details class="reveal">
+        <summary><span data-i18n="faq.6.q">How do I pay, and can I get an invoice?</span><span class="plus" aria-hidden="true"></span></summary>
+        <div class="ans" data-i18n="faq.6.a">Any major card, billed in USD through our payment provider — no mainland wallet or phone verification needed. A receipt is issued for every charge, and Business plans can request invoices with company details for accounting.</div>
+      </details>
+      <details class="reveal">
+        <summary><span data-i18n="faq.7.q">Where is this hosted, and who can use it?</span><span class="plus" aria-hidden="true"></span></summary>
+        <div class="ans" data-i18n="faq.7.a">The gateway runs on infrastructure in Hong Kong with HTTPS end to end. Thelsy is open to developers worldwide except where sanctions or our <a href="/aup.html">Acceptable Use Policy</a> prohibit it — no malware, no spam, no fraud, and no reselling access to banned regions.</div>
+      </details>
+    </div>
+  </div>
+</section><!-- ====== final cta ====== -->
+<section class="sec-sm">
+  <div class="wrap">
+    <div class="cta-box reveal">
+      <h2 data-i18n="cta.h2">Ship the feature, not the billing integration.</h2>
+      <p data-i18n="cta.p">Send one request and read the token split for yourself. Starter includes 30M tokens per month.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#pricing" data-i18n="cta.btn">Get your API key</a>
+        <a class="btn" href="mailto:support@thelsy.com" data-i18n="cta.btn2">Ask a question</a>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- ====== footer ====== -->
+<footer>
+  <div class="wrap">
+    <div class="f-grid">
+      <div class="f-brand">
+        <a class="brand" href="#top">
+          <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 7h14M12 7v10"/></svg></span>
+          Thelsy
+        </a>
+        <p data-i18n="foot.blurb">An OpenAI-compatible API gateway: DeepSeek Flash on one key, billed per token, paid by card.</p>
+      </div>
+      <div class="f-col">
+        <h4 data-i18n="foot.product">Product</h4>
+        <a href="#models" data-i18n="nav.models">Models</a>
+        <a href="#pricing" data-i18n="nav.pricing">Pricing</a>
+        <a href="https://api.thelsy.com/sign-in" data-signin data-i18n="nav.signin">Sign in</a>
+      </div>
+      <div class="f-col">
+        <h4 data-i18n="foot.dev">Developers</h4>
+        <a href="#quickstart" data-i18n="nav.quickstart">Quickstart</a>
+        <a href="#codex" data-i18n="nav.codex">Codex CLI</a>
+        <a href="#faq" data-i18n="nav.faq">FAQ</a>
+        <a href="mailto:support@thelsy.com">support@thelsy.com</a>
+      </div>
+      <div class="f-col">
+        <h4 data-i18n="foot.guides">Guides</h4>
+        <a href="/claude-code.html" data-i18n="guide.claude">Claude Code setup</a>
+        <a href="/codex.html" data-i18n="guide.codex">Codex CLI setup</a>
+        <a href="/deepseek-api-card-payment.html" data-i18n="guide.card">Paying by card</a>
+        <a href="/deepseek-without-wechat.html" data-i18n="guide.wechat">DeepSeek without WeChat</a>
+      </div>
+      <div class="f-col">
+        <h4 data-i18n="foot.legal">Legal</h4>
+        <a href="/terms.html" data-i18n="leg.terms">Terms of Service</a>
+        <a href="/privacy.html" data-i18n="leg.privacy">Privacy Policy</a>
+        <a href="/refund.html" data-i18n="leg.refund">Refund Policy</a>
+        <a href="/aup.html" data-i18n="leg.aup">Acceptable Use</a>
+      </div>
+    </div>
+    <div class="f-bottom">
+      <span>&copy; <span id="year">2026</span> Thelsy. <span data-i18n="foot.rights">All rights reserved.</span></span>
+      <span class="legal" data-i18n="foot.tm">Model names are trademarks of their respective owners. Thelsy is an independent gateway and is not affiliated with or endorsed by them.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ==========================================================
+     Global link config — the only place you need to edit.
+     signinUrl -> every "Sign in" link.
+     Checkout links are set directly on the three plan buttons.
+     ========================================================== */
+  var CONFIG = {
+    signinUrl: "https://api.thelsy.com/sign-in"    /* every "Sign in" link */
+  };
+  document.querySelectorAll("[data-signin]").forEach(function (a) {
+    a.setAttribute("href", CONFIG.signinUrl);
+  });
+
+  /* ---------- year ---------- */
+  document.getElementById("year").textContent = String(new Date().getFullYear());
+
+  /* ---------- nav background after scrolling ---------- */
+  var nav = document.getElementById("nav");
+  var onScroll = function () {
+    nav.classList.toggle("is-scrolled", window.scrollY > 12);
+  };
+  onScroll();
+  window.addEventListener("scroll", onScroll, { passive: true });
+
+  /* ---------- mobile menu ---------- */
+  var toggle = document.getElementById("navToggle");
+  var panel = document.getElementById("mobilePanel");
+  var setMenu = function (open) {
+    panel.classList.toggle("open", open);
+    toggle.setAttribute("aria-expanded", String(open));
+  };
+  toggle.addEventListener("click", function () {
+    setMenu(!panel.classList.contains("open"));
+  });
+  panel.addEventListener("click", function (e) {
+    if (e.target.closest("a")) setMenu(false);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") setMenu(false);
+  });
+
+  /* ---------- code tabs ---------- */
+  var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
+  var panes = { curl: "p-curl", python: "p-python", node: "p-node", stream: "p-stream" };
+  function selectTab(name) {
+    tabs.forEach(function (t) {
+      t.setAttribute("aria-selected", String(t.dataset.tab === name));
+    });
+    Object.keys(panes).forEach(function (k) {
+      document.getElementById(panes[k]).hidden = k !== name;
+    });
+  }
+  tabs.forEach(function (t) {
+    t.addEventListener("click", function () { selectTab(t.dataset.tab); });
+  });
+
+  /* ---------- copy to clipboard ---------- */
+  var copyBtn = document.getElementById("copyBtn");
+  copyBtn.addEventListener("click", function () {
+    var copyLabel = copyBtn.textContent;
+    var active = document.querySelector(".tab[aria-selected='true']").dataset.tab;
+    var text = document.getElementById(panes[active]).innerText;
+    var done = function () {
+      copyBtn.textContent = "Copied";
+      copyBtn.classList.add("done");
+      window.setTimeout(function () {
+        copyBtn.textContent = copyLabel;
+        copyBtn.classList.remove("done");
+      }, 1600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () {});
+    } else {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+
+  /* ---------- copy button for a static code block ---------- */
+  document.querySelectorAll("[data-copy]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var label = btn.textContent;
+      var pre = document.getElementById(btn.getAttribute("data-copy"));
+      if (!pre) return;
+      var text = pre.innerText;
+      var done = function () {
+        btn.textContent = "Copied";
+        btn.classList.add("done");
+        window.setTimeout(function () {
+          btn.textContent = label;
+          btn.classList.remove("done");
+        }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () {});
+      } else {
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); done(); } catch (e) {}
+        document.body.removeChild(ta);
+      }
+    });
+  });
+  /* ---------- spotlight that follows the cursor on cards ---------- */
+  document.querySelectorAll(".card").forEach(function (card) {
+    card.addEventListener("pointermove", function (e) {
+      var r = card.getBoundingClientRect();
+      card.style.setProperty("--mx", (e.clientX - r.left) + "px");
+      card.style.setProperty("--my", (e.clientY - r.top) + "px");
+    });
+  });
+
+  /* ---------- reveal on scroll ---------- */
+  var items = document.querySelectorAll(".reveal");
+  if (!("IntersectionObserver" in window)) {
+    items.forEach(function (el) { el.classList.add("in"); });
+  } else {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("in");
+          io.unobserve(entry.target);
+        }
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.08 });
+    items.forEach(function (el) { io.observe(el); });
+  }
+
+  /* ---------- marquee: duplicate once for a seamless loop ---------- */
+  var track = document.getElementById("marquee");
+  track.innerHTML += track.innerHTML;
+  /* ==========================================================
+     Bilingual copy: English lives in the HTML, Chinese lives
+     here. Toggle remembers the visitor's choice.
+     ========================================================== */
+  var ZH = {
+    "nav.models": "模型",
+    "nav.features": "为什么选 Thelsy",
+    "nav.quickstart": "快速开始",
+    "nav.pricing": "价格",
+    "nav.faq": "常见问题",
+    "nav.codex": "Codex 接入",
+    "nav.signin": "登录",
+    "nav.cta": "获取 API Key",
+
+    "hero.pill.a": "兼容 OpenAI",
+    "hero.pill.b": "API 网关",
+    "hero.h1.a": "DeepSeek Flash。",
+    "hero.h1.b": "一个 API Key，开箱即用。",
+    "hero.sub": "Thelsy 提供 DeepSeek Flash（model ID: <code>deepseek-flash</code>），走一个兼容 OpenAI 的接口。继续用你现有的 SDK，只改一个地址，用你手上的信用卡付款。",
+    "hero.cta1": "获取 API Key",
+    "hero.cta2": "查看快速开始",
+    "hero.note.a": "无最低消费",
+    "hero.note.b": "随时取消",
+    "hero.note.c": "香港节点提供服务",
+
+    "stat.a": "个模型，一个接口",
+    "stat.b": "套兼容 OpenAI 的接口",
+    "stat.c": "可用性目标",
+    "stat.d": "次静默换模型",
+
+    "mock.credit": "本月 token 额度",
+    "mock.left": "剩余",
+    "mock.used": "已用",
+    "mock.reset": "12 天后重置",
+
+    "integ.title": "直接接入你正在用的工具链",
+
+    "feat.eyebrow": "为什么选 Thelsy",
+    "feat.h2": "为被大厂忽略的开发者而生。",
+    "feat.sub": "国内模型厂仍然只认微信和支付宝，海外模型厂又禁止转售。Thelsy 站在中间做交付层：一份协议、一张账单、一个 Key。",
+    "feat.1.h": "按你真正能用的方式付款",
+    "feat.1.p": "不需要微信、不需要支付宝，也不需要国内手机号。Thelsy 按美元结算，支持主流信用卡，每笔都有可报销的收据，Business 套餐可以开发票。",
+    "feat.2.h": "一个 Key，一个接口",
+    "feat.2.p": "把你的 OpenAI SDK 指向 <code>https://api.thelsy.com/v1</code> 就行。同一个 Key 用在所有环境，同一套请求格式，同一张账单，上线期间不必再跑去注册第二个平台。",
+    "feat.3.h": "绝不悄悄降级模型",
+    "feat.3.p": "我们不会偷偷把你的请求转到更便宜的模型上。任何线路变更都会公布日期，并在调用日志里标出来——信任本身就是这个产品的全部。",
+    "feat.4.h": "经得起对账的计量",
+    "feat.4.p": "每一次请求都单独列出输入、输出和缓存 token。用量台账可导出 CSV，可设置硬性预算上限，账目精确到每一个 token。",
+    "feat.5.h": "为流式与智能体而生",
+    "feat.5.p": "SSE 流式响应会在最后一个数据块里带上用量，支持工具调用、JSON 模式和长上下文。上游的差异都被抹平，一套客户端适配所有模型。",
+    "feat.6.h": "认真对待你的数据",
+    "feat.6.p": "请求在写入日志之前先做脱敏，记录保留六个月；你的提示词和回复不会被售卖，也不会被用于训练模型。",
+
+    "models.eyebrow": "模型目录",
+    "models.h2": "按 token 计价，不打包出售。",
+    "models.sub": "下表是每 100 万 token 的综合参考价，已混合输入、输出与缓存。在发出请求之前，控制台会展示明细价目表，包含缓存读取与缓存写入的价格。",
+    "models.note": "综合参考价。缓存读取与缓存写入单独计价——高频命中缓存通常是跑模型最省钱的方式，而且每一笔都按请求展示，省了多少一眼可见。",
+    "t.model": "模型",
+    "t.use": "适用场景",
+    "t.tier": "档位",
+    "t.price": "每 100 万 token",
+    "m.dsflash": "对话、信息抽取、工具调用与长上下文任务",
+    "tier.economy": "经济",
+    "cap.h": "能力边界",
+    "cap.ok.h": "接口能做什么",
+    "cap.ok.1": "文本生成与对话",
+    "cap.ok.2": "工具调用（Function Calling）—— 兼容 OpenAI 的 <code>tools</code> 与 <code>tool_calls</code>",
+    "cap.ok.3": "结构化输出 —— <code>response_format: json_object</code>",
+    "cap.ok.4": "推理模式 —— 默认开启思考，思考过程通过 <code>reasoning_content</code> 返回",
+    "cap.ok.5": "图片理解（图片输入）",
+    "cap.ok.6": "<b>100 万 token</b> 上下文窗口，单次输出最多 <b>384K</b> token",
+    "cap.no.h": "不支持什么",
+    "cap.no.1": "图片生成",
+    "cap.no.2": "音频 / 视频生成",
+    "cap.note": "输出由上游模型产生，可能有错。重要结论请自行核实后再使用。",
+    "qs.eyebrow": "快速开始",
+    "qs.h2": "大约两分钟就能跑通。",
+    "qs.sub": "如果你的代码本来就在调用 OpenAI 接口，那只需要改 <code>base_url</code> 和 Key。SDK、重试逻辑、提示词模板全部照旧。",
+    "qs.1.h": "创建账号",
+    "qs.1.p": "在 Creem 的结账页完成付款（无需先注册）。我们会在几小时内为你开通账号，并把控制台登录信息和 API Key 发到你付款时用的邮箱。",
+    "qs.2.h": "把 base URL 指向 Thelsy",
+    "qs.2.p": "用 <code>https://api.thelsy.com/v1</code> 替换原来的服务商地址。模型名与目录中完全一致，不用改。",
+    "qs.3.h": "上线，然后盯住用量",
+    "qs.3.p": "每次调用都会进入用量日志并记录 token 拆分。设一个预算上限，花超之前就会收到提醒。",
+    "qs.copy": "复制",
+
+    "codex.eyebrow": "Codex 接入",
+    "codex.h2": "让 Codex CLI 直接连上 Thelsy。",
+    "codex.sub": "Codex CLI 可以直接接入本服务。把下面这段加进 Codex 的配置文件（默认 <code>~/.codex/config.toml</code>），Codex 就会通过我们的接口跑在 <code>deepseek-flash</code> 上。",
+    "codex.note": "<b><code>disable_response_storage = true</code> 是必须的。</b>少这一行会报 <code>stream closed before response.completed</code>，请照抄不要改。",
+    "codex.copy": "复制",
+    "claude.eyebrow": "Claude Code 接入",
+    "claude.h2": "让 Claude Code 直接连上 Thelsy。",
+    "claude.sub": "我们在同一域名下提供 Anthropic 兼容的接口。设置下面两个变量，Claude Code 就会通过你的套餐跑在 <code>deepseek-flash</code> 上 —— 流式输出、工具调用、system 提示词全都支持。",
+    "claude.note": "Windows PowerShell 下改用 <code>$env:ANTHROPIC_BASE_URL</code> 和 <code>$env:ANTHROPIC_AUTH_TOKEN</code> 设置同样两个变量（值同上），然后运行 <code>claude</code>。首次使用需先安装：<code>npm install -g @anthropic-ai/claude-code</code>。",
+    "claude.copy": "复制",
+    "foot.guides": "使用指南",
+    "guide.claude": "Claude Code 接入步骤",
+    "guide.codex": "Codex CLI 接入步骤",
+    "guide.card": "用卡付款",
+    "guide.wechat": "不用微信/支付宝接入 DeepSeek",
+    "price.eyebrow": "价格",
+    "price.h2": "套餐管规模，token 只加一点点。",
+    "price.sub": "每个套餐都能调用全部模型，token 单价完全相同。套餐决定的是月度 token 额度、并发和支持力度，而不是你能用哪些模型。",
+    "price.mo": "/ 月",
+    "price.note": "包含的 token 先用。超额不会自动计费：额度用完后调用会暂停，而不是变成一笔意外账单 —— 增购额度或升级套餐即可继续使用。额度是按输入/输出的典型混合比例估算的，偏重输出的任务（长文本、代码生成）token 消耗更快。随时可以在控制台更换套餐或取消：不锁客、不收违约金。",
+    "plan.starter": "Starter",
+    "plan.starter.d": "适合个人开发者做第一个原型。",
+    "plan.starter.1": "<b>每月含 30M tokens</b>",
+    "plan.starter.2": "<b>2 个</b> API Key",
+    "plan.starter.3": "目录内全部模型，不分档限权",
+    "plan.starter.4": "每分钟 60 次请求",
+    "plan.starter.5": "邮件支持",
+    "plan.pro": "Pro",
+    "plan.pro.d": "适合已经有真实流量的产品。",
+    "plan.pro.1": "<b>每月含 80M tokens</b>",
+    "plan.pro.2": "<b>10 个</b> API Key，可区分环境",
+    "plan.pro.3": "所有模型优先调度",
+    "plan.pro.4": "预算上限与消费提醒",
+    "plan.pro.5": "每分钟 300 次请求",
+    "plan.biz": "Business",
+    "plan.biz.d": "适合需要发票和 SLA 的团队。",
+    "plan.biz.1": "<b>每月含 250M tokens</b>",
+    "plan.biz.2": "不限 Key 数量与团队席位",
+    "plan.biz.3": "每分钟 1,000 次请求，专属通道",
+    "plan.biz.4": "99.9% 可用性 SLA 与数据处理协议",
+    "plan.biz.5": "发票、收据与优先支持",
+    "plan.over.80": "增购额度 <b>$0.80</b> / 1M tokens",
+    "plan.over.75": "增购额度 <b>$0.75</b> / 1M tokens",
+    "plan.popular": "最受欢迎",
+    "plan.cta": "选择 Starter",
+    "plan.cta2": "选择 Pro",
+    "plan.cta3": "选择 Business",
+    "pay.h": "付款之后会发生什么",
+    "pay.1.h": "你完成付款",
+    "pay.1.p": "在 Creem 的托管结账页用信用卡付款，付款前不需要先注册账号。",
+    "pay.2.h": "我们为你开通账号",
+    "pay.2.p": "通常在几小时内，我们会开通你的账号，并把控制台登录信息和 API Key 发到你付款时使用的邮箱。",
+    "pay.3.h": "开始调用接口",
+    "pay.3.p": "把 SDK 指向 <code>https://api.thelsy.com/v1</code>，就能发出第一个请求。",
+    "pay.urgent": "急用？付款后发邮件到 <a href=\"mailto:support@thelsy.com\">support@thelsy.com</a>，我们会优先为你开通。",
+    "pay.mor": "款项由我们的商户记录方（merchant of record）处理，负责税费、发票和信用卡收款。",
+    "test.h": "还没决定？先拿一个免费测试 key",
+    "test.p": "发邮件到 <a href=\"mailto:support@thelsy.com?subject=Free%20test%20key\">support@thelsy.com</a>，主题写 <b>Free test key</b>，我们就会给你一个测试 key。不用信用卡，也不用注册。",
+    "test.btn": "申请测试 key",
+    "faq.eyebrow": "常见问题",
+    "faq.h2": "选网关前，值得问清楚的问题",
+    "faq.1.q": "现在可以调用哪些模型？",
+    "faq.1.a": "目前目录里就是 <code>deepseek-flash</code>（DeepSeek Flash），通过 <code>https://api.thelsy.com/v1</code> 这个兼容 OpenAI 的接口提供。新通道会挂到同一接口上并写入更新日志，每个模型的实时状态在控制台里随时可查。",
+    "faq.2.q": "我需要重写现有代码吗？",
+    "faq.2.a": "不需要。我们使用 OpenAI 的接口格式，SDK、流式解析和工具调用代码都不用改。把 <code>base_url</code> 指向 <code>https://api.thelsy.com/v1</code>、换上新 Key，模型名沿用原来的即可。",
+    "faq.3.q": "具体怎么计费？",
+    "faq.3.a": "按 token、按请求计费。输入、输出和缓存 token 分别统计，并在用量日志的每一行展示，所以命中缓存比冷启动明显更便宜。每月包含的 token 先扣减；用完后调用会暂停，增购额度或升级套餐即可继续使用。订阅价之外不会再产生任何费用。",
+    "faq.cli.q": "编程 CLI 会把套餐额度用得多快？",
+    "faq.cli.a": "比普通对话快得多。Claude Code、Codex CLI 每一轮都会重发很长的上下文，一个任务就可能消耗几十万 token —— 足够撑一个月普通 API 调用的额度，在密集使用 agent 的情况下可能几天就花完。提示词缓存能让重复部分更便宜，每一次请求也都在用量日志里逐条列出。额度用完后调用会暂停，需要增购或升级套餐；如果你打算整天挂着 agent 跑，Pro 或 Business 更合适。",
+    "faq.4.q": "你们会不会偷偷换掉我的模型？",
+    "faq.4.a": "永远不会。收了旗舰模型的钱却悄悄跑更弱的模型，是摧毁开发者信任最快的方式，我们在制度上直接排除这种做法。如果某条线路必须调整，会公布日期，并在你的调用日志里体现出来。",
+    "faq.5.q": "我的提示词和回复会被怎么处理？",
+    "faq.5.a": "请求在写入日志之前会先做脱敏，记录保留六个月，用于对账与滥用审查；任何数据都不会被售卖，也不会用于训练模型。Business 客户可以要求完全关闭请求体日志，只保留计量记录。",
+    "faq.6.q": "怎么付款？可以开发票吗？",
+    "faq.6.a": "支持主流信用卡，通过我们的支付服务商以美元结算，不需要国内钱包或手机号验证。每笔扣费都会出收据，Business 套餐可申请带公司信息的发票用于入账。",
+    "faq.7.q": "服务器在哪里？谁可以使用？",
+    "faq.7.a": "网关部署在香港的服务器上，全程 HTTPS 加密。除制裁地区或违反我们《可接受使用政策》的情况外，全球开发者都可以使用——禁止恶意软件、垃圾信息、欺诈，以及向被禁地区转售访问权限。",
+
+    "cta.h2": "去做功能，别去做计费系统。",
+    "cta.p": "发一个请求，自己看 token 怎么拆。Starter 每月含 30M tokens。",
+    "cta.btn": "获取 API Key",
+    "cta.btn2": "咨询一下",
+
+    "foot.blurb": "兼容 OpenAI 的 API 网关：一个 Key 用上 DeepSeek Flash，按 token 计费，信用卡付款。",
+    "foot.product": "产品",
+    "foot.dev": "开发者",
+    "foot.legal": "法务",
+    "foot.rights": "保留所有权利。",
+    "foot.tm": "文中模型名称均为其各自所有者的商标。Thelsy 是独立网关，与上述公司无隶属或背书关系。",
+    "leg.terms": "服务条款",
+    "leg.privacy": "隐私政策",
+    "leg.refund": "退款政策",
+    "leg.aup": "可接受使用政策"
+  };
+
+  var originals = new WeakMap();
+  function applyLang(lang) {
+    document.querySelectorAll("[data-i18n]").forEach(function (el) {
+      if (!originals.has(el)) originals.set(el, el.innerHTML);
+      var en = originals.get(el);
+      var zh = ZH[el.getAttribute("data-i18n")];
+      el.innerHTML = (lang === "zh" && zh) ? zh : en;
+    });
+    document.documentElement.setAttribute("lang", lang === "zh" ? "zh-CN" : "en");
+    document.documentElement.setAttribute("data-lang", lang);
+    document.querySelectorAll("[data-lang-btn]").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-lang-btn") === lang));
+    });
+    try { localStorage.setItem("thelsy-lang", lang); } catch (e) {}
+  }
+
+  var saved = null;
+  try { saved = localStorage.getItem("thelsy-lang"); } catch (e) {}
+  if (!saved) {
+    saved = (navigator.language || "").toLowerCase().indexOf("zh") === 0 ? "zh" : "en";
+  }
+  applyLang(saved);
+
+  document.querySelectorAll("[data-lang-btn]").forEach(function (b) {
+    b.addEventListener("click", function () { applyLang(b.getAttribute("data-lang-btn")); });
+  });
+})();
+</script>
+</body>
+</html>
