@@ -199,3 +199,79 @@ Start here: **https://thelsy.com**
 
 The code samples in this repository are released under the MIT License. Use them
 however you like.
+
+---
+
+# Appendix
+
+## A. Codex CLI — the two lines that matter
+
+`~/.codex/config.toml`:
+
+```toml
+model = "deepseek-flash"
+model_provider = "custom"
+disable_response_storage = true
+
+[model_providers.custom]
+base_url = "https://api.thelsy.com/v1"
+wire_api = "responses"
+```
+
+> **`disable_response_storage = true` is required.** Without that line Codex fails with
+> `stream closed before response.completed`. It is not a workaround — the Responses API
+> wire format needs the client to stop asking the server to store the response.
+
+Codex talks to `/v1/responses`. The gateway also accepts `/v1/chat/completions` if you are
+wiring something else.
+
+## B. Claude Code
+
+```bash
+export ANTHROPIC_BASE_URL="https://api.thelsy.com"
+export ANTHROPIC_AUTH_TOKEN="sk-your-key"
+claude
+```
+
+PowerShell:
+
+```powershell
+$env:ANTHROPIC_BASE_URL="https://api.thelsy.com"
+$env:ANTHROPIC_AUTH_TOKEN="sk-your-key"
+claude
+```
+
+Install once with `npm install -g @anthropic-ai/claude-code`. Streaming, tool calls and
+system prompts all work through this path.
+
+## C. Troubleshooting
+
+| Symptom | What is actually happening | Fix |
+|---|---|---|
+| `503 No available channel for model 'gpt-6-astra' under group default` | The client sent **its own default model name**, not the one you configured. The gateway has no such model. | On the gateway side, map the client's model name to a real one — in the channel's **Model Mapping** write `{"gpt-6-astra":"deepseek-flash"}` (client model name → your real model), **and add that alias to the channel's model list as well**. The gateway will prompt you to save — accept it. |
+| `stream closed before response.completed` (Codex) | `disable_response_storage` is missing from `config.toml`. | Add `disable_response_storage = true`. |
+| Tool calls silently never fire | The wire format is wrong for the client. Codex needs `wire_api = "responses"`; other clients use `chat`. | Set `wire_api` to whatever that client expects. |
+| Works in `curl`, fails in a CLI | The CLI adds its own headers and parameters, and may send extra background requests. | Check the request body in the CLI's verbose/debug mode before blaming the endpoint. |
+
+## D. Not affiliated with DeepSeek
+
+Thelsy is **not affiliated with DeepSeek** and is not an official DeepSeek service.
+DeepSeek is a trademark of its respective owner. This repository is maintained by the
+operator of Thelsy; it contains no client library, it is a quickstart, not an SDK.
+
+Prompts and completions are redacted before they are written to usage logs, and usage is
+itemised per request (input / output / cached tokens) so you can reconcile every call.
+
+## E. 写给做同类东西的人（中文）
+
+两份来自生产环境的记录。它们讲的是**管道**，不是模型：
+
+- [用 Creem 做自动发货：两个只有真实付款才会暴露的坑](docs/creem-webhook-pitfalls.md)
+  —— 首笔订阅会在**同一秒**发 `checkout.completed` + `subscription.paid` 两条
+  `event_key` 不同的事件，同一个直觉的按事件去重会让**同一笔钱加两次额度**；以及生产环境标识是
+  `prod` 而不是 `live`（写错会**静默丢弃每一笔真实付款**）。
+- [用 New API 做 SaaS 自动开户：四个只会被真实流量撞出来的坑](docs/new-api-integration-pitfalls.md)
+  —— `PUT /api/user/` 只写四个字段（传 `quota` 无效且不报错）、`email` 写不进去导致客户无法自助找回密码、
+  建令牌只能给"当前登录用户"建、以及自带支付模块在密钥为空时会放行伪造回调。
+
+这四个坑的共同点是**都不报错**：接口返回成功、日志干净，但业务是错的。
