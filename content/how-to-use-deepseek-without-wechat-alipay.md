@@ -187,4 +187,16 @@ That's worth $19 to some people and worth nothing to others. Both answers are co
 
 ---
 
+## If you'd rather skip the setup
+
+Full disclosure: I built one of these, so weigh the recommendation accordingly.
+
+[Thelsy](https://thelsy.com) serves `deepseek-flash` on an OpenAI-compatible endpoint, with an Anthropic-compatible path on the same host for Claude Code and a Responses-compatible path for Codex CLI. Card subscription in USD, per-request token usage in the console, and no automatic overage charge — when a plan's included tokens run out, calls stop.
+
+- **[The full write-up, with the FAQ, on thelsy.com](https://thelsy.com/deepseek-without-wechat.html)**
+- [Plans and allowances](https://thelsy.com/#pricing)
+- Questions first? support@thelsy.com
+
+---
+
 *Thelsy is not affiliated with DeepSeek and is not an official DeepSeek service. DeepSeek is a trademark of its respective owner. Prices quoted for the official platform are from DeepSeek's published pricing page and are subject to change.*
