@@ -280,6 +280,7 @@ tbody tr:hover{background:rgba(124,92,255,.055)}
 .testkey h3{font-size:17px;margin-bottom:8px}
 .testkey p{color:var(--muted);font-size:14.4px;max-width:64ch}
 .testkey a{color:var(--accent-2);text-decoration:underline;text-underline-offset:3px}
+.testkey-top{margin-top:0;margin-bottom:22px}
 .fine{margin-top:16px;color:var(--muted-2);font-size:13.2px;max-width:78ch}
 
 /* code */
@@ -799,6 +800,14 @@ stream = client.chat.completions.create(
       <p data-i18n="price.sub">Every plan reaches the full catalogue at the same per-token rates. The plan decides your monthly token allowance, throughput and support — never which models you are allowed to use.</p>
     </div>
 
+    <div class="testkey testkey-top reveal">
+      <div>
+        <h3 data-i18n="trial.h">Not ready for a subscription? Start with $8.</h3>
+        <p data-i18n="trial.p">One-time payment — no plan, no renewal. <b>$8 buys 10M tokens</b> on the same endpoint and at the same per-token rates as the monthly plans, which is enough to run a real workload and read the metering before committing to anything.</p>
+      </div>
+      <a class="btn btn-primary" href="https://www.creem.io/payment/prod_14NvVQ5lLNUc9GQAk4C82L" data-i18n="trial.cta">Buy 10M tokens for $8</a>
+    </div>
+
     <div class="price-grid">
       <article class="plan reveal" style="--d:.02s">
         <div>
@@ -1286,6 +1295,9 @@ stream = client.chat.completions.create(
     "test.h": "还没决定？先拿一个免费测试 key",
     "test.p": "发邮件到 <a href=\"mailto:support@thelsy.com?subject=Free%20test%20key\">support@thelsy.com</a>，主题写 <b>Free test key</b>，我们就会给你一个测试 key。不用信用卡，也不用注册。",
     "hero.cta3": "拿一个免费测试 key",
+    "trial.h": "还不想订套餐？先花 $8 起。",
+    "trial.p": "一次性付款 —— 不是订阅，不会自动续费。<b>$8 换 10M tokens</b>，走同一个接口、同样的每 token 价格，够你跑一个真实负载、把计费明细看清楚，再决定要不要订。",
+    "trial.cta": "花 $8 买 10M tokens",
     "hero.free.b": "不用信用卡，也不用注册。",
     "hero.free.t": "给我们发一封邮件，我们把一个能用的 key 发回去 —— 付款之前先把接口跑通。",
     "test.btn": "申请测试 key",
